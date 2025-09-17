@@ -1,1 +1,1 @@
-I was lazy so I spend some time to spend less time in the future. 
+I was lazy so I spent some time to spend less time. 
