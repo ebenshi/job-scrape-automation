@@ -173,7 +173,7 @@ def notion_create_page(job):
         "Company": {"rich_text": [{"text": {"content": (job.get("company") or "")[:200]}}]},
         "Source Link": {"url": job["url"]},
         "Age": {"rich_text": [{"text": {"content": (job.get("age") or "")}}]},
-        "Age (Days)": {"rich_text": [{"text": {"content": (job.get("age_days") or "0d")}}]},
+        "Age": {"rich_text": [{"text": {"content": (job.get("age_days") or "0d")}}]},
         "Location": {"rich_text": [{"text": {"content": (job.get("location") or "")}}]},
     }
 
