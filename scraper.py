@@ -23,6 +23,7 @@ NYC_PATTERNS = [
     r"\bQueens\b",
     r"\bBronx\b",
     r"\bStaten Island\b",
+    r"\bRemote in USA\b",
 ]
 
 SECTION_MARKERS = [
