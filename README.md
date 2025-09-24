@@ -91,12 +91,14 @@ The scraper automatically keeps age information current by:
 - Updating the Age property with the current value from the GitHub repository
 - Handling various age formats (days, weeks, months) and normalizing them
 
-## NYC Location Patterns
+## Location Patterns
 
 The scraper recognizes NYC locations using these patterns:
 - NYC, NY, New York
 - Manhattan, Brooklyn, Queens, Bronx, Staten Island
 - Various abbreviations and formats
+
+After cloning, feel free to change or add your specific location preferences.
 
 ## Error Handling
 
