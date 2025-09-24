@@ -1,4 +1,4 @@
-import os, re, json, base64
+import os, re, json, base64, sys
 from datetime import datetime, timezone
 import requests
 from bs4 import BeautifulSoup
@@ -187,6 +187,120 @@ def notion_create_page(job):
     r.raise_for_status()
     return r.json()
 
+def fetch_notion_pages():
+    """Fetch all pages from the Notion database"""
+    headers = {
+        "Authorization": f"Bearer {NOTION_TOKEN}",
+        "Notion-Version": "2022-06-28",
+        "Content-Type": "application/json",
+    }
+    
+    pages = []
+    has_more = True
+    start_cursor = None
+    
+    while has_more:
+        url = f"https://api.notion.com/v1/databases/{NOTION_DB_ID}/query"
+        body = {}
+        if start_cursor:
+            body["start_cursor"] = start_cursor
+            
+        r = requests.post(url, headers=headers, json=body, timeout=30)
+        r.raise_for_status()
+        data = r.json()
+        
+        pages.extend(data.get("results", []))
+        has_more = data.get("has_more", False)
+        start_cursor = data.get("next_cursor")
+    
+    return pages
+
+
+def update_notion_page_age(page_id, age_value):
+    """Update the age property of a Notion page"""
+    headers = {
+        "Authorization": f"Bearer {NOTION_TOKEN}",
+        "Notion-Version": "2022-06-28",
+        "Content-Type": "application/json",
+    }
+    
+    # age_value should already be in "Xd" format from GitHub repo
+    body = {
+        "properties": {
+            "Age": {
+                "rich_text": [{"text": {"content": age_value}}]
+            }
+        }
+    }
+    
+    try:
+        r = requests.patch(f"https://api.notion.com/v1/pages/{page_id}", headers=headers, json=body, timeout=30)
+        r.raise_for_status()
+        return True
+    except Exception as e:
+        print(f"Error updating page {page_id}: {e}")
+        return False
+
+def find_matching_github_job(source_url, github_jobs):
+    """Find the matching job in GitHub repo based on source URL"""
+    for job in github_jobs:
+        if job.get("url") == source_url:
+            return job
+    return None
+
+def update_all_pages_age():
+    """Update age for all existing pages in Notion database by matching with GitHub repo"""
+    print("Fetching all pages from Notion database...")
+    pages = fetch_notion_pages()
+    print(f"Found {len(pages)} pages to update")
+    
+    # Get current GitHub repo data
+    print("Fetching current GitHub repository data...")
+    md = fetch_readme_markdown()
+    md_subset = slice_sections(md)
+    github_jobs = extract_jobs_from_tables(md_subset)
+    print(f"Found {len(github_jobs)} jobs in GitHub repo")
+    
+    updated_count = 0
+    error_count = 0
+    not_found_count = 0
+    
+    for page in pages:
+        try:
+            # Get the source link from the page properties
+            source_link_prop = page.get("properties", {}).get("Source Link", {})
+            if not source_link_prop or source_link_prop.get("type") != "url":
+                continue
+                
+            source_url = source_link_prop.get("url")
+            if not source_url:
+                continue
+            
+            # Find matching job in GitHub repo
+            matching_job = find_matching_github_job(source_url, github_jobs)
+            if not matching_job:
+                not_found_count += 1
+                print(f"No matching job found in GitHub repo for: {source_url}")
+                continue
+            
+            # Get the age from GitHub repo (already in "Xd" format)
+            github_age = matching_job.get("age_days", "0d")
+            
+            # Update the page
+            page_id = page["id"]
+            if update_notion_page_age(page_id, github_age):
+                updated_count += 1
+                print(f"Updated page {page_id}: {github_age} (from GitHub repo)")
+            else:
+                error_count += 1
+                
+        except Exception as e:
+            print(f"Error processing page {page.get('id', 'unknown')}: {e}")
+            error_count += 1
+    
+    print(f"Age update complete: {updated_count} updated, {not_found_count} not found in GitHub repo, {error_count} errors")
+    return updated_count, error_count
+
 def notify(text):
     if not SLACK_WEBHOOK_URL:
         return
@@ -196,6 +310,13 @@ def notify(text):
         pass
 
 def main():
+    # Check if we should update ages only
+    if len(sys.argv) > 1 and sys.argv[1] == "--update-ages":
+        print("Updating ages for all existing pages...")
+        updated, errors = update_all_pages_age()
+        print(f"Age update complete: {updated} pages updated, {errors} errors")
+        return
+    
     seen = load_seen()
     md = fetch_readme_markdown()
     md_subset = slice_sections(md)
@@ -223,6 +344,11 @@ def main():
     # Always save seen.json to persist the baseline
     save_seen(seen)
     print(f"Checked {len(jobs_all)} rows across SWE/PM/DS-AI, added {created} NYC items.")
+    
+    # After adding new items, also update ages for all pages
+    print("\nUpdating ages for all pages...")
+    updated, errors = update_all_pages_age()
+    print(f"Age update complete: {updated} pages updated, {errors} errors")
 
 if __name__ == "__main__":
     main()
