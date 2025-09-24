@@ -23,6 +23,7 @@ NYC_PATTERNS = [
     r"\bQueens\b",
     r"\bBronx\b",
     r"\bStaten Island\b",
+    r"\bRemote in USA\b",
 ]
 
 SECTION_MARKERS = [
@@ -329,7 +330,7 @@ def main():
         if not job.get("url"):
             continue
         # Use URL as the stable identifier
-        if job["url"] in seen:
+        if job["url"] in seen or "Phd" in job["title"] or "🎓" in job["title"]:
             continue
         if looks_like_nyc(job.get("location") or ""):
             new_items.append(job)
